@@ -51,7 +51,7 @@ jobs:
         run: flutter build apk --debug
 
       - name: Upload coverage
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-${{ github.run_number }}
           path: coverage/lcov.info
@@ -59,7 +59,7 @@ jobs:
           retention-days: 14
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: feishin-remote-debug-${{ github.run_number }}
           path: build/app/outputs/flutter-apk/app-debug.apk
