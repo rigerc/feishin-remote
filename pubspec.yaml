@@ -1,0 +1,24 @@
+name: feishin_remote
+description: "Android remote control for a running Feishin music player."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  audio_service: ^0.18.19
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: ^10.3.1
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
