@@ -110,16 +110,18 @@ jobs:
             --obfuscate \
             --split-debug-info="build/symbols/${{ steps.version.outputs.version }}"
 
-      - name: Verify APK signature
+      - name: Verify release APK
         run: |
           set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-release.apk"
           apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
-          if [[ -z "$apksigner" ]]; then
-            echo "Android apksigner was not found" >&2
+          aapt2="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort -V | tail -1)"
+          if [[ -z "$apksigner" || -z "$aapt2" ]]; then
+            echo "Android APK verification tools were not found" >&2
             exit 1
           fi
-          "$apksigner" verify --verbose --print-certs \
-            build/app/outputs/flutter-apk/app-release.apk
+          "$apksigner" verify --verbose --print-certs "$apk"
+          "$aapt2" dump resources "$apk" | grep 'drawable/ic_stat_feishin' >/dev/null
 
       - name: Package release files
         run: |
