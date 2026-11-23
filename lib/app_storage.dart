@@ -42,6 +42,7 @@ class AppStorage {
   static const _serversKey = 'saved_servers';
   static const _lastServerKey = 'last_server';
   static const _lightThemeKey = 'light_theme';
+  static const _desktopAccentKey = 'desktop_accent';
 
   final SharedPreferencesAsync _preferences;
   final FlutterSecureStorage _secureStorage;
@@ -91,6 +92,12 @@ class AppStorage {
 
   Future<void> setUseLightTheme(bool value) =>
       _preferences.setBool(_lightThemeKey, value);
+
+  Future<bool> matchDesktopAccent() async =>
+      await _preferences.getBool(_desktopAccentKey) ?? false;
+
+  Future<void> setMatchDesktopAccent(bool value) =>
+      _preferences.setBool(_desktopAccentKey, value);
 
   String _passwordKey(String id) => 'server_password_$id';
 }

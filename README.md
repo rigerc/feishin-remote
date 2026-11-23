@@ -9,7 +9,11 @@ Android remote control for a running [Feishin](https://github.com/jeffvli/feishi
 ## Features
 
 - Play, pause, previous, next, seek, volume, shuffle, and repeat controls
-- Live artwork, favorite state, rating, and playback position
+- Now Playing with fullscreen artwork, favorites, rating, and mute with volume restore
+- Search and browse tracks, albums, playlists, and internet radio stations
+- Play now, next, or last with shuffle options, start Track Radio, and add songs to playlists
+- View, search, jump within, reorder, remove from, and clear the live desktop queue
+- Optional matching of the desktop accent in either Android theme
 - Track year, genre, format, bitrate, sample rate, bit depth, track/disc number, and play count
 - Multiple saved Feishin server profiles
 - Password encryption through Android Keystore
@@ -20,7 +24,8 @@ Android remote control for a running [Feishin](https://github.com/jeffvli/feishi
 ## Requirements
 
 - Android device and Feishin computer on the same network
-- Feishin desktop application; Remote is not exposed by the browser build
+- Feishin desktop application with Remote enabled
+- Feishin 1.16.0 or newer for browsing, playlist actions, radio, and queue management. Earlier versions support basic playback controls.
 - Feishin Remote enabled and reachable through its configured port (`4333` by default)
 
 ## Configure Feishin
@@ -161,9 +166,11 @@ A release build intentionally fails when any signing variable is absent rather t
 
 ```text
 lib/app_storage.dart          Saved profiles, theme preference, secure passwords
-lib/feishin_remote.dart       WebSocket protocol, state parsing, reconnect logic
+lib/feishin_remote.dart       WebSocket session, requests, playback, and reconnect logic
+lib/remote_protocol.dart      Library, queue, radio, and accent wire models
 lib/remote_audio_handler.dart Android media-session bridge
-lib/remote_app.dart           Material UI
+lib/remote_app.dart           Material navigation, connection setup, and Now Playing
+lib/remote_browser.dart       Catalogs, queue, and playback actions
 assets/logo.svg               Editable logo source
 assets/logo.png               In-app and README logo
 ```

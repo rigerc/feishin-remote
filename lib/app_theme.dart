@@ -27,15 +27,22 @@ abstract final class AppRadius {
 }
 
 abstract final class AppTheme {
-  static ThemeData light() => _build(Brightness.light);
+  static ThemeData light({String? accent}) => _build(Brightness.light, accent);
 
-  static ThemeData dark() => _build(Brightness.dark);
+  static ThemeData dark({String? accent}) => _build(Brightness.dark, accent);
 
-  static ThemeData _build(Brightness brightness) {
+  static Color? _parseAccent(String? value) {
+    if (value == null || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(value)) {
+      return null;
+    }
+    return Color(0xff000000 | int.parse(value.substring(1), radix: 16));
+  }
+
+  static ThemeData _build(Brightness brightness, String? accent) {
     final dark = brightness == Brightness.dark;
     final colors =
         ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE9B44C),
+          seedColor: _parseAccent(accent) ?? const Color(0xFFE9B44C),
           brightness: brightness,
         ).copyWith(
           surface: dark ? const Color(0xFF15171A) : const Color(0xFFFFF9EE),

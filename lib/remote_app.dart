@@ -4,6 +4,7 @@ import 'package:feishin_remote/app_storage.dart';
 import 'package:feishin_remote/app_theme.dart';
 import 'package:feishin_remote/feishin_remote.dart';
 import 'package:feishin_remote/remote_audio_handler.dart';
+import 'package:feishin_remote/remote_browser.dart';
 import 'package:feishin_remote/widget_keys.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,16 +27,45 @@ class RemoteApp extends StatefulWidget {
 
 class _RemoteAppState extends State<RemoteApp> {
   bool _useLightTheme = false;
+  bool _matchDesktopAccent = false;
+  RemoteAccent? _accent;
 
   @override
   void initState() {
     super.initState();
+    widget.client.addListener(_syncAccent);
     unawaited(_loadTheme());
+  }
+
+  @override
+  void dispose() {
+    widget.client.removeListener(_syncAccent);
+    super.dispose();
+  }
+
+  void _syncAccent() {
+    final accent = _matchDesktopAccent ? widget.client.accent : null;
+    if (_accent != accent) setState(() => _accent = accent);
   }
 
   Future<void> _loadTheme() async {
     final useLightTheme = await widget.storage.useLightTheme();
-    if (mounted) setState(() => _useLightTheme = useLightTheme);
+    final matchDesktopAccent = await widget.storage.matchDesktopAccent();
+    if (!mounted) return;
+    setState(() {
+      _useLightTheme = useLightTheme;
+      _matchDesktopAccent = matchDesktopAccent;
+      _accent = matchDesktopAccent ? widget.client.accent : null;
+    });
+  }
+
+  Future<void> _toggleAccent() async {
+    final enabled = !_matchDesktopAccent;
+    setState(() {
+      _matchDesktopAccent = enabled;
+      _accent = enabled ? widget.client.accent : null;
+    });
+    await widget.storage.setMatchDesktopAccent(enabled);
   }
 
   Future<void> _toggleTheme() async {
@@ -47,8 +77,8 @@ class _RemoteAppState extends State<RemoteApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: AppTheme.light(),
-    darkTheme: AppTheme.dark(),
+    theme: AppTheme.light(accent: _accent?.light),
+    darkTheme: AppTheme.dark(accent: _accent?.dark),
     themeMode: _useLightTheme ? ThemeMode.light : ThemeMode.dark,
     title: 'Feishin Remote',
     home: _RemoteHome(
@@ -56,6 +86,8 @@ class _RemoteAppState extends State<RemoteApp> {
       storage: widget.storage,
       useLightTheme: _useLightTheme,
       onToggleTheme: () => unawaited(_toggleTheme()),
+      matchDesktopAccent: _matchDesktopAccent,
+      onToggleAccent: () => unawaited(_toggleAccent()),
     ),
   );
 }
@@ -66,12 +98,16 @@ class _RemoteHome extends StatefulWidget {
     required this.storage,
     required this.useLightTheme,
     required this.onToggleTheme,
+    required this.matchDesktopAccent,
+    required this.onToggleAccent,
   });
 
   final FeishinRemoteClient client;
   final AppStorage storage;
   final bool useLightTheme;
   final VoidCallback onToggleTheme;
+  final bool matchDesktopAccent;
+  final VoidCallback onToggleAccent;
 
   @override
   State<_RemoteHome> createState() => _RemoteHomeState();
@@ -232,7 +268,13 @@ class _RemoteHomeState extends State<_RemoteHome> {
                 cacheWidth: AppSize.artworkCacheWidth,
               ),
               const SizedBox(width: AppSpace.xs),
-              const Expanded(child: Text('FEISHIN // REMOTE')),
+              const Expanded(
+                child: Text(
+                  'FEISHIN // REMOTE',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           actions: [
@@ -260,15 +302,22 @@ class _RemoteHomeState extends State<_RemoteHome> {
           ],
         ),
         body: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: AppSize.contentMax),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpace.md),
-                child: active
-                    ? _NowPlaying(client: widget.client)
-                    : _ConnectionForm(
+          child: active
+              ? _ConnectedRemote(
+                  key: ValueKey(widget.client.session),
+                  client: widget.client,
+                  matchDesktopAccent: widget.matchDesktopAccent,
+                  onToggleAccent: widget.onToggleAccent,
+                )
+              : Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: AppSize.contentMax,
+                    ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppSpace.md),
+                      child: _ConnectionForm(
                         client: widget.client,
                         servers: _servers,
                         selectedServerId: _selectedServerId,
@@ -283,13 +332,220 @@ class _RemoteHomeState extends State<_RemoteHome> {
                             : () => unawaited(_deleteServer()),
                         onConnect: _connect,
                       ),
-              ),
-            ),
-          ),
+                    ),
+                  ),
+                ),
         ),
       );
     },
   );
+}
+
+enum _Destination { playing, library, playlists, radio, queue }
+
+class _ConnectedRemote extends StatefulWidget {
+  const _ConnectedRemote({
+    required this.client,
+    required this.matchDesktopAccent,
+    required this.onToggleAccent,
+    super.key,
+  });
+
+  final FeishinRemoteClient client;
+  final bool matchDesktopAccent;
+  final VoidCallback onToggleAccent;
+
+  @override
+  State<_ConnectedRemote> createState() => _ConnectedRemoteState();
+}
+
+class _ConnectedRemoteState extends State<_ConnectedRemote> {
+  late final _actions = RemoteActions(widget.client);
+  final _visited = {_Destination.playing};
+  _Destination _selected = _Destination.playing;
+
+  void _select(_Destination destination) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _selected = destination;
+      _visited.add(destination);
+    });
+  }
+
+  @override
+  void dispose() {
+    _actions.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final client = widget.client;
+    final expanded = client.expanded && client.online;
+    final selected = expanded ? _selected : _Destination.playing;
+    return Column(
+      children: [
+        if ((expanded, client.errorMessage) case (true, final String message))
+          Padding(
+            padding: const EdgeInsets.all(AppSpace.sm),
+            child: _ErrorBanner(
+              message: message,
+              onDismiss: client.dismissError,
+            ),
+          ),
+        ListenableBuilder(
+          listenable: _actions,
+          builder: (context, _) => _actions.value
+              ? const LinearProgressIndicator()
+              : const SizedBox.shrink(),
+        ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: AppSize.contentMax),
+              child: IndexedStack(
+                index: selected.index,
+                sizing: StackFit.expand,
+                children: [
+                  for (final destination in _Destination.values)
+                    TickerMode(
+                      enabled: destination == selected,
+                      child:
+                          _visited.contains(destination) &&
+                              (expanded || destination == _Destination.playing)
+                          ? switch (destination) {
+                              _Destination.playing => SingleChildScrollView(
+                                padding: const EdgeInsets.all(AppSpace.md),
+                                child: _NowPlaying(
+                                  client: client,
+                                  onShowQueue: () =>
+                                      _select(_Destination.queue),
+                                  matchDesktopAccent: widget.matchDesktopAccent,
+                                  onToggleAccent: widget.onToggleAccent,
+                                ),
+                              ),
+                              _Destination.library => RemoteLibraryView(
+                                actions: _actions,
+                              ),
+                              _Destination.playlists => RemoteCatalogView(
+                                catalog: RemoteCatalog.playlists,
+                                actions: _actions,
+                              ),
+                              _Destination.radio => RemoteCatalogView(
+                                catalog: RemoteCatalog.radio,
+                                actions: _actions,
+                              ),
+                              _Destination.queue => RemoteQueueView(
+                                actions: _actions,
+                              ),
+                            }
+                          : const SizedBox.shrink(),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (expanded &&
+            MediaQuery.viewInsetsOf(context).bottom == 0 &&
+            selected != _Destination.playing &&
+            (client.state.song != null || client.radio != null))
+          _MiniPlayer(
+            client: client,
+            onTap: () => _select(_Destination.playing),
+          ),
+        if (expanded)
+          NavigationBar(
+            selectedIndex: selected.index,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            onDestinationSelected: (index) =>
+                _select(_Destination.values[index]),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.play_circle_outline_rounded),
+                label: 'Playing',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.library_music_outlined),
+                label: 'Library',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.playlist_play_rounded),
+                label: 'Playlists',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.radio_rounded),
+                label: 'Radio',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.queue_music_rounded),
+                label: 'Queue',
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _MiniPlayer extends StatelessWidget {
+  const _MiniPlayer({required this.client, required this.onTap});
+
+  final FeishinRemoteClient client;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final song = client.state.song;
+    final radio = client.radio;
+    final playing = client.state.status == 'playing';
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      child: ListTile(
+        onTap: onTap,
+        leading: RemoteThumbnail(
+          image: radio == null ? song?.image : radio.image,
+          bytes: radio == null ? song?.artworkBytes : null,
+          icon: radio == null ? Icons.album_rounded : Icons.radio_rounded,
+        ),
+        title: Text(
+          radio?.name ?? song?.name ?? '',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          radio != null ? 'Radio' : song?.artistName ?? '',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (radio == null)
+              IconButton(
+                tooltip: 'Previous track',
+                onPressed: () => client.send('previous'),
+                icon: const Icon(Icons.skip_previous_rounded),
+              ),
+            IconButton(
+              tooltip: playing ? 'Pause' : 'Play',
+              onPressed: () => client.send(playing ? 'pause' : 'play'),
+              icon: Icon(
+                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              ),
+            ),
+            if (radio == null)
+              IconButton(
+                tooltip: 'Next track',
+                onPressed: () => client.send('next'),
+                icon: const Icon(Icons.skip_next_rounded),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ConnectionStatus extends StatelessWidget {
@@ -469,7 +725,10 @@ class _ConnectionForm extends StatelessWidget {
             ),
             if (storageMessage case final message?) ...[
               const SizedBox(height: AppSpace.md),
-              _ErrorBanner(message: message),
+              _ErrorBanner(
+                message: message,
+                onDismiss: client.online ? client.dismissError : null,
+              ),
             ],
             if (client.errorMessage case final message?) ...[
               const SizedBox(height: AppSpace.md),
@@ -497,25 +756,79 @@ class _ConnectionForm extends StatelessWidget {
 }
 
 class _NowPlaying extends StatelessWidget {
-  const _NowPlaying({required this.client});
+  const _NowPlaying({
+    required this.client,
+    required this.onShowQueue,
+    required this.matchDesktopAccent,
+    required this.onToggleAccent,
+  });
 
   final FeishinRemoteClient client;
+  final VoidCallback onShowQueue;
+  final bool matchDesktopAccent;
+  final VoidCallback onToggleAccent;
 
   @override
   Widget build(BuildContext context) {
     final state = client.state;
     final song = state.song;
+    final radio = client.radio;
+    final playing = state.status == 'playing';
+    final next = client.upNext;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (client.errorMessage case final message?) ...[
+        if ((!client.expanded, client.errorMessage) case (
+          true,
+          final String message,
+        )) ...[
           _ErrorBanner(message: message),
           const SizedBox(height: AppSpace.md),
         ],
-        _Artwork(song: song),
+        _Artwork(
+          title: radio?.name ?? song?.name,
+          image: radio == null ? song?.image : radio.image,
+          bytes: radio == null ? song?.artworkBytes : null,
+          radio: radio != null,
+          onError: radio == null ? client.requestArtwork : null,
+          onFullscreen: (context, artwork) => showDialog<void>(
+            context: context,
+            builder: (dialog) => Dialog.fullscreen(
+              child: Scaffold(
+                appBar: AppBar(
+                  title: Text(radio?.name ?? song?.name ?? 'Artwork'),
+                  leading: CloseButton(onPressed: () => Navigator.pop(dialog)),
+                ),
+                body: Center(child: InteractiveViewer(child: artwork)),
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: AppSpace.lg),
-        if (song == null)
+        if (radio != null) ...[
+          Text(
+            radio.name,
+            style: Theme.of(context).textTheme.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            'Internet radio',
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpace.sm),
+          Center(
+            child: IconButton.filled(
+              tooltip: playing ? 'Pause' : 'Play',
+              onPressed: () => client.send(playing ? 'pause' : 'play'),
+              icon: Icon(
+                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              ),
+            ),
+          ),
+        ] else if (song == null)
           const _IdleState()
         else ...[
           _TrackInfo(
@@ -533,43 +846,97 @@ class _NowPlaying extends StatelessWidget {
           _ProgressControl(client: client, state: state),
         ],
         const SizedBox(height: AppSpace.lg),
-        _VolumeControl(client: client, value: state.volume),
+        if (client.online) _VolumeControl(client: client, value: state.volume),
+        if (next != null)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            onTap: onShowQueue,
+            leading: RemoteThumbnail(
+              image: next.image,
+              icon: Icons.music_note_rounded,
+            ),
+            title: Text(
+              next.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: const Text('Up next in queue'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+        if (client.expanded)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Match desktop accent'),
+            value: matchDesktopAccent,
+            onChanged: (_) => onToggleAccent(),
+          ),
       ],
     );
   }
 }
 
 class _Artwork extends StatelessWidget {
-  const _Artwork({required this.song});
+  const _Artwork({
+    required this.title,
+    required this.image,
+    required this.bytes,
+    required this.radio,
+    required this.onError,
+    required this.onFullscreen,
+  });
 
-  final FeishinSong? song;
+  final String? title;
+  final Uri? image;
+  final Uint8List? bytes;
+  final bool radio;
+  final VoidCallback? onError;
+  final void Function(BuildContext, Widget) onFullscreen;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bytes = song?.artworkBytes;
-
+    final placeholder = Icon(
+      radio ? Icons.radio_rounded : Icons.album_rounded,
+      size: AppSize.artworkMax / 2,
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final artwork = bytes != null
+        ? Image.memory(
+            bytes!,
+            cacheWidth: AppSize.artworkCacheWidth,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => placeholder,
+          )
+        : image != null
+        ? Image.network(
+            image.toString(),
+            cacheWidth: AppSize.artworkCacheWidth,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (context.mounted) onError?.call();
+              });
+              return placeholder;
+            },
+          )
+        : placeholder;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: AppSize.artworkMax),
         child: AspectRatio(
           aspectRatio: 1,
-          child: ClipRRect(
+          child: Material(
+            color: theme.colorScheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(AppRadius.large),
-            child: ColoredBox(
-              color: theme.colorScheme.surfaceContainerHigh,
-              child: bytes == null
-                  ? Icon(
-                      Icons.album_rounded,
-                      size: AppSize.artworkMax / 2,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    )
-                  : Image.memory(
-                      bytes,
-                      cacheWidth: AppSize.artworkCacheWidth,
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                    ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: bytes == null && image == null
+                  ? null
+                  : () => onFullscreen(context, artwork),
+              child: Semantics(
+                label: title == null ? null : 'Artwork for $title',
+                child: artwork,
+              ),
             ),
           ),
         ),
@@ -909,7 +1276,13 @@ class _VolumeControl extends StatelessWidget {
     sliderKey: WidgetKeys.volume,
     value: value,
     max: 100,
-    leading: const Icon(Icons.volume_up_rounded),
+    leading: IconButton(
+      tooltip: value > 0 ? 'Mute' : 'Unmute',
+      onPressed: client.toggleMute,
+      icon: Icon(
+        value > 0 ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+      ),
+    ),
     trailing: Text(value.round().toString()),
     onChangeEnd: (volume) => _command(
       client: client,
@@ -979,9 +1352,10 @@ class _LabeledSliderState extends State<_LabeledSlider> {
 }
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+  const _ErrorBanner({required this.message, this.onDismiss});
 
   final String message;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -991,13 +1365,25 @@ class _ErrorBanner extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.small),
       child: Padding(
         padding: const EdgeInsets.all(AppSpace.sm),
-        child: SelectionArea(
-          child: Text(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onErrorContainer,
+        child: Row(
+          children: [
+            Expanded(
+              child: SelectionArea(
+                child: Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
             ),
-          ),
+            if (onDismiss != null)
+              IconButton(
+                tooltip: 'Dismiss message',
+                onPressed: onDismiss,
+                icon: const Icon(Icons.close_rounded),
+              ),
+          ],
         ),
       ),
     );
