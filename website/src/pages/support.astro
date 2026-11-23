@@ -1,0 +1,12 @@
+---
+import Site from "../layouts/Site.astro";
+const repository = import.meta.env.PUBLIC_REPOSITORY;
+---
+<Site title="Support">
+  <article class="document">
+    <h1>Support</h1>
+    <p>Install Feishin on your computer, open <strong>Settings → Window</strong>, and enable <strong>Remote control server</strong>. Enter the computer's address in the app, for example <code>http://192.168.1.20:4333</code>, along with any username and password you set.</p>
+    <p>Both devices must be on the same network. Library browsing, playlist actions, radio and queue management need Feishin 1.16.0 or newer. Earlier versions support basic playback controls.</p>
+    {repository && <p><a href={`https://github.com/${repository}/issues/new`}>Report a problem</a> or read the <a href={`https://github.com/${repository}#readme`}>documentation</a>.</p>}
+  </article>
+</Site>
