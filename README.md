@@ -103,13 +103,14 @@ The Flutter version is pinned in `.fvmrc`. The app name, description and Android
 tool/media.sh               # screenshots and video
 tool/media.sh screenshots   # stills only
 tool/media.sh video         # video and poster only
-tool/site.sh                # install website dependencies and build
-npm --prefix website run dev
+tool/site.sh                # install website dependencies, check, and build
 ```
 
-`tool/capture_test.dart` renders the real app against a fake Feishin desktop on a local socket, using a fictional library and generated artwork. It needs FFmpeg with WebP and H.264 encoders. PNGs and the video are written to `build/media`, and the website assets to `website/public/media`. The site build is in `website/dist`.
+`tool/capture_test.dart` renders the real app against a fake Feishin desktop on a local socket, using a fictional library and generated artwork. It needs FFmpeg with WebP and H.264 encoders. PNGs and the video are written to `build/media`, and the website assets to `website/public/media`.
 
-The **Website and media** workflow builds the site and uploads `website-preview` and `app-media` artifacts. To deploy, set **Settings → Pages → Source → GitHub Actions** and add the Actions variable `PAGES_ENABLED=true`. Set `PUBLIC_SITE_URL` if you need a URL override, or `downloadUrl` in `project.json` to change the download link, which otherwise points to the latest GitHub release.
+`website/` is an [Astro Rocket](https://github.com/hansmartensdev/Astro-Rocket) site with [Starlight](https://starlight.astro.build/) docs, built from [project-website-bootstrap](https://github.com/rigerc/project-website-bootstrap). It needs Node.js (see `website/.nvmrc`) and pnpm. `tool/site.sh` runs its lint, type checks, unit tests, build, and output checks; the build is in `website/dist`. For local development run `pnpm dev` in `website/`. See [website/README.md](website/README.md) and the site's **Website and media** docs page.
+
+The **Website and media** workflow captures the app media, builds the site, captures website screenshots with Playwright, and uploads `website-preview`, `app-media`, and `site-media` artifacts. To deploy, set **Settings → Pages → Source → GitHub Actions** and add the Actions variable `PAGES_ENABLED=true`. The workflow passes the Pages origin and sub-path to the build as `SITE_URL` and `BASE_PATH`.
 
 ## CI and releases
 
@@ -165,8 +166,8 @@ lib/remote_app.dart           Material navigation, connection setup, and Now Pla
 lib/remote_browser.dart       Catalogs, queue, and playback actions
 assets/logo.svg               Editable logo source
 assets/logo.png               In-app and README logo
-project.json                  App name, description, application ID, site URLs
+project.json                  App name, description, application ID
 tool/                         Verification, release, media, and site scripts
-website/                      Product site
+website/                      Product site and docs (Astro Rocket + Starlight)
 CHANGELOG.md                  Release notes
 ```

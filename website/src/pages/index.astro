@@ -1,68 +1,99 @@
 ---
-import Site from "../layouts/Site.astro";
-import project from "../../../project.json";
+import LandingLayout from '@/layouts/LandingLayout.astro';
+import Icon from '@/components/ui/primitives/Icon/Icon.astro';
+import { project } from '@/config/project.config';
+import { withBase } from '@/lib/base';
+import '@/styles/project.css';
 
-const asset = (name: string) => `${import.meta.env.BASE_URL.replace(/\/$/, "")}/media/${name}`;
-const repository = import.meta.env.PUBLIC_REPOSITORY;
-const download = project.downloadUrl ||
-  (repository ? `https://github.com/${repository}/releases/latest` : "");
-const features = [
-  ["Now Playing", "Artwork, favorites, ratings, volume, shuffle and repeat for whatever your computer is playing."],
-  ["Search and browse", "Find tracks, albums, playlists and internet radio, then play now, next or last."],
-  ["Live queue", "See the desktop queue, jump to a track, reorder, remove or clear it."],
-  ["Android media controls", "Notification, lock screen, headset and Bluetooth buttons control Feishin."],
-];
+/** App captures written by `tool/media.sh` into `public/media/`. */
+const media = (file: string) => withBase(`/media/${file}`);
+const [hero, ...gallery] = project.screenshots;
 ---
-<Site>
-  <section class="intro">
-    <div>
-      <h1>{project.name}</h1>
-      <p>{project.description} Audio keeps playing on your computer; your phone becomes the remote.</p>
-      {download && <a class="button" href={download}>Download the APK</a>}
-      <p class="note">Needs Feishin desktop with Remote enabled. Library browsing and queue tools need Feishin 1.16.0 or newer.</p>
-    </div>
-    <figure>
-      <img src={asset("playing.webp")} alt="Now Playing with artwork, favorite, rating and transport controls" width="800" height="1760" />
-      <img src={asset("library.webp")} alt="Searchable track list with a mini player and navigation bar" width="800" height="1760" />
-      <img src={asset("queue.webp")} alt="The live desktop queue with the current track highlighted" width="800" height="1760" />
-    </figure>
-  </section>
-  <section class="features" aria-labelledby="features-title">
-    <h2 id="features-title">What it does</h2>
-    <ul>
-      {features.map(([title, text]) => <li><h3>{title}</h3><p>{text}</p></li>)}
-    </ul>
-  </section>
-  <section class="tour" aria-labelledby="tour-title">
-    <div>
-      <h2 id="tour-title">See how it works</h2>
-      <p>Check what is playing, search the library, then manage the queue.</p>
-    </div>
-    <video controls playsinline preload="none" poster={asset("tour-poster.webp")} aria-label="Silent walkthrough of the app">
-      <source src={asset("tour.mp4")} type="video/mp4" />
-      <a href={asset("tour.mp4")}>Download the walkthrough</a>
-    </video>
-  </section>
-</Site>
 
-<style>
-  .intro, .tour { display: grid; grid-template-columns: 1fr 1.25fr; gap: clamp(1.5rem, 5vw, 4rem); align-items: center; }
-  h1, h2 { font-weight: 700; line-height: 1; letter-spacing: -0.04em; margin: 0; }
-  h1 { font-size: clamp(3rem, 8vw, 5.5rem); }
-  h2 { font-size: clamp(2rem, 4.5vw, 3rem); }
-  h3 { margin: 0 0 .35rem; font-size: 1.1rem; }
-  p { max-width: 34ch; font-size: 1.1rem; line-height: 1.55; }
-  .note { font-size: .95rem; color: #bdb4a3; }
-  .button { display: inline-block; padding: .85rem 1.2rem; border-radius: .5rem; color: #261c05; background: #e9b44c; font-weight: 650; text-decoration: none; }
-  figure { display: grid; grid-template-columns: repeat(3, 1fr); align-items: start; gap: .75rem; margin: 0; padding: clamp(.75rem, 3vw, 1.5rem); border-radius: 1.5rem; background: #202328; }
-  img, video { display: block; max-width: 100%; border-radius: .85rem; box-shadow: 0 0 0 1px #ffffff1f; }
-  img { width: 100%; height: auto; }
-  figure img:nth-child(2) { margin-top: 1.5rem; }
-  .features { margin-top: clamp(3rem, 9vw, 6rem); }
-  .features ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin: 1.5rem 0 0; padding: 0; list-style: none; }
-  .features li { padding: 1.25rem; border-radius: 1rem; background: #202328; }
-  .features p { margin: 0; font-size: 1rem; }
-  .tour { margin-top: clamp(3rem, 9vw, 6rem); padding: clamp(1rem, 5vw, 3rem); border-radius: 1.5rem; background: #202328; }
-  video { width: min(100%, 17rem); margin-inline: auto; background: #15171a; }
-  @media (max-width: 43rem) { .intro, .tour { grid-template-columns: 1fr; } }
-</style>
+<LandingLayout title={project.name} description={project.description}>
+  <main id="main-content" class="project-site">
+    <section class="project-hero" aria-labelledby="project-title">
+      <div class="project-glow" aria-hidden="true"></div>
+      <div class="project-shell hero-grid">
+        <div class="hero-content">
+          <div class="project-eyebrow"><span class="eyebrow-dot"></span>{project.eyebrow}</div>
+          <h1 id="project-title">{project.headline}</h1>
+          <p class="hero-summary">{project.summary}</p>
+          <div class="hero-actions">
+            <a class="project-button primary" href={project.downloadUrl}>Download the APK <Icon name="download" size="sm" /></a>
+            <a class="project-button secondary" href={withBase('/docs/getting-started/')}>Set it up <Icon name="arrow-up-right" size="sm" /></a>
+          </div>
+          <div class="hero-meta"><span class="status-dot"></span> {project.versionLabel} <span aria-hidden="true">/</span> Android <span aria-hidden="true">/</span> No tracking</div>
+          <p class="hero-note">{project.requirement}</p>
+        </div>
+        <div class="phone-stack">
+          {gallery.map((shot) => (
+            <img class="phone-shot back" src={media(shot.file)} alt="" width="800" height="1760" loading="eager" decoding="async" />
+          ))}
+          <img class="phone-shot front" src={media(hero.file)} alt={hero.alt} width="800" height="1760" loading="eager" decoding="async" fetchpriority="high" />
+        </div>
+      </div>
+      <div class="project-shell hero-bottom"><span>AUDIO STAYS ON YOUR COMPUTER</span><span>01 / OVERVIEW</span></div>
+    </section>
+
+    <section id="features" class="project-section" aria-labelledby="features-title">
+      <div class="project-shell">
+        <div class="section-kicker">WHAT IT DOES</div>
+        <div class="section-heading"><h2 id="features-title">Everything Feishin does,<br /><em>in your pocket.</em></h2><p>Control playback, find something new to play, and shape the queue without walking back to your computer.</p></div>
+        <div class="feature-grid">
+          {project.benefits.map((benefit) => (
+            <article class="feature-card">
+              <div class="feature-top"><span>{benefit.number}</span><span class="feature-icon"><Icon name={benefit.icon} size="lg" /></span></div>
+              <h3>{benefit.title}</h3>
+              <p>{benefit.description}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="tour" class="project-section section-alt" aria-labelledby="tour-title">
+      <div class="project-shell">
+        <div class="section-kicker">SEE IT WORK</div>
+        <div class="section-heading"><h2 id="tour-title">Playing, library,<br /><em>and the live queue.</em></h2><p>Captured from the real app, connected to a demo Feishin library.</p></div>
+        <div class="tour-grid">
+          <figure class="tour-video">
+            <video controls playsinline preload="none" poster={media('tour-poster.webp')} aria-label="Silent walkthrough of the app" width="600" height="1320">
+              <source src={media('tour.mp4')} type="video/mp4" />
+              <a href={media('tour.mp4')}>Download the walkthrough</a>
+            </video>
+            <figcaption>Walkthrough, no sound</figcaption>
+          </figure>
+          {gallery.map((shot) => (
+            <figure class="tour-shot">
+              <img src={media(shot.file)} alt={shot.alt} width="800" height="1760" loading="lazy" decoding="async" />
+              <figcaption>{shot.label}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="setup" class="project-section" aria-labelledby="setup-title">
+      <div class="project-shell workflow-grid">
+        <div>
+          <div class="section-kicker">SETUP</div>
+          <h2 id="setup-title">Connected in<br />three steps.</h2>
+          <p class="section-lead">Your phone and computer need to be on the same network. Feishin's Remote listens on port 4333 by default.</p>
+          <a class="project-text-link" href={withBase('/docs/getting-started/')}>Read the setup guide <Icon name="arrow-up-right" size="sm" /></a>
+        </div>
+        <ol class="workflow-steps">
+          {project.steps.map((step, index) => (
+            <li class="workflow-step"><span class="step-number">0{index + 1}</span><div><h3>{step.label}</h3><p>{step.detail}</p></div></li>
+          ))}
+        </ol>
+      </div>
+    </section>
+
+    <section id="faq" class="project-section section-alt" aria-labelledby="faq-title">
+      <div class="project-shell faq-grid"><div><div class="section-kicker">QUESTIONS</div><h2 id="faq-title">Good to know.</h2><p class="section-lead">Short answers here. More in the <a href={withBase('/docs/troubleshooting/')}>troubleshooting guide</a>.</p></div><div class="faq-list">{project.faqs.map((item) => (<details><summary>{item.question}<Icon name="plus" size="sm" /></summary><p>{item.answer}</p></details>))}</div></div>
+    </section>
+
+    <section class="project-final-cta" aria-labelledby="start-title"><div class="project-shell final-inner"><span class="section-kicker">GET THE APP</span><h2 id="start-title">Leave the computer.<br />Keep the music.</h2><p>Free, open source, and without accounts or tracking.</p><div class="hero-actions"><a class="project-button primary" href={project.downloadUrl}>Download the APK <Icon name="download" size="sm" /></a><a class="project-button secondary" href={project.repository} target="_blank" rel="noopener noreferrer">View source <Icon name="github" size="sm" /></a></div></div></section>
+  </main>
+</LandingLayout>
