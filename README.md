@@ -66,7 +66,7 @@ Feishin serves HTTP and WebSocket traffic without TLS by default. Basic Auth cre
 
 Prerequisites:
 
-- Flutter 3.44 or newer
+- Flutter 3.47.5 (see `.fvmrc`)
 - Android SDK
 - Java 17
 
@@ -77,12 +77,10 @@ flutter pub get
 flutter run
 ```
 
-Run checks:
+Run the full check (format, analysis with fatal infos, tests with coverage):
 
 ```sh
-dart format --output=none --set-exit-if-changed lib test
-flutter analyze
-flutter test
+tool/verify.sh
 ```
 
 Build a debug APK:
@@ -97,15 +95,38 @@ Output:
 build/app/outputs/flutter-apk/app-debug.apk
 ```
 
+The Flutter version is pinned in `.fvmrc`. The app name, description and Android application ID live in `project.json`. Keep `applicationId` unchanged: installed copies upgrade only when it and the signing key match.
+
+## Screenshots, video, and website
+
+```sh
+tool/media.sh               # screenshots and video
+tool/media.sh screenshots   # stills only
+tool/media.sh video         # video and poster only
+tool/site.sh                # install website dependencies and build
+npm --prefix website run dev
+```
+
+`tool/capture_test.dart` renders the real app against a fake Feishin desktop on a local socket, using a fictional library and generated artwork. It needs FFmpeg with WebP and H.264 encoders. PNGs and the video are written to `build/media`, and the website assets to `website/public/media`. The site build is in `website/dist`.
+
+The **Website and media** workflow builds the site and uploads `website-preview` and `app-media` artifacts. To deploy, set **Settings → Pages → Source → GitHub Actions** and add the Actions variable `PAGES_ENABLED=true`. Set `PUBLIC_SITE_URL` if you need a URL override, or `downloadUrl` in `project.json` to change the download link, which otherwise points to the latest GitHub release.
+
 ## CI and releases
 
-`.github/workflows/android-ci.yml` validates every relevant push and pull request. It checks formatting, runs analysis and tests with coverage, builds a debug APK, and uploads the APK and coverage report as workflow artifacts.
+`.github/workflows/ci.yml` runs `tool/verify.sh`, builds a debug APK, and uploads it and the coverage report as workflow artifacts.
 
-`.github/workflows/android-release.yml` creates signed GitHub Releases from `v*.*.*` tags or a manual workflow dispatch. Release builds are obfuscated, signature-verified, and published with a SHA-256 checksum. Obfuscation symbols are retained as a private workflow artifact for crash symbolication.
+### Release
 
-### Create the signing key
+1. Increase `version: X.Y.Z+N` in `pubspec.yaml` and add a matching `## X.Y.Z` entry in `CHANGELOG.md`. The build number `N` becomes the Android version code and must increase with every release. `v0.1.0` and `v0.1.1` used build numbers 1 and 2.
+2. Run `tool/verify.sh` and `tool/android_release.sh --dry-run`. **Actions → Android release → Run workflow** offers the same preflight.
+3. Push a matching `vX.Y.Z` tag from a commit on the default branch. With signing configured, CI verifies the signed APK and creates a **draft** GitHub release containing the APK, release notes, metadata, and SHA-256 checksums. The obfuscation symbols are kept for 90 days as a separate workflow artifact for crash symbolication.
+4. Check the checksums, install the APK over the previous version, then publish the draft.
 
-Generate the key once and keep an offline backup:
+Validate a downloaded release with `sha256sum --check SHA256SUMS`. If creating the draft failed partway, remove the incomplete draft before retrying the same tag. Never reuse or move a published tag. Ship fixes under a new version with a higher build number.
+
+### Android signing
+
+Generate the key once and keep an offline backup. Use the same key as earlier releases so installed copies can upgrade.
 
 ```sh
 keytool -genkeypair -v \
@@ -116,51 +137,22 @@ keytool -genkeypair -v \
   -validity 10000
 ```
 
-Add these encrypted repository secrets under **GitHub → Settings → Secrets and variables → Actions**:
+For GitHub Actions, create an environment named `android-signing` (set its deployment tag rule to `v*` and require reviewers where supported) and add these environment secrets:
 
-| Secret | Value |
+| Local environment variable | GitHub Actions environment secret |
 | --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | Base64-encoded contents of `release.jks` |
-| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
-| `ANDROID_KEY_ALIAS` | Key alias, such as `feishin-remote` |
-| `ANDROID_KEY_PASSWORD` | Private-key password |
+| `ANDROID_KEYSTORE_PATH` (absolute path) | `ANDROID_KEYSTORE_BASE64` (`base64 -w 0 release.jks`) |
+| `ANDROID_KEYSTORE_PASSWORD` | `ANDROID_KEYSTORE_PASSWORD` |
+| `ANDROID_KEY_ALIAS` | `ANDROID_KEY_ALIAS` |
+| `ANDROID_KEY_PASSWORD` | `ANDROID_KEY_PASSWORD` |
 
-Create the Base64 value on Linux with:
-
-```sh
-base64 -w 0 release.jks
-```
-
-Never commit the keystore or passwords. The workflow decodes the key only for the build and removes it afterward.
-
-### Publish a release
-
-Create and push a SemVer tag:
+Never commit the keystore or passwords. To build a signed release locally, set the four variables above and run:
 
 ```sh
-git tag -a v1.0.0 -m "Feishin Remote 1.0.0"
-git push origin v1.0.0
+ANDROID_HOME=/path/to/android-sdk tool/android_release.sh
 ```
 
-The tag determines the Android version name. The GitHub run number becomes the monotonically increasing version code. A release can also be started manually from **Actions → Android Release → Run workflow**.
-
-### Build a signed release locally
-
-```sh
-export ANDROID_KEYSTORE_PATH="$PWD/android/app/release.jks"
-export ANDROID_KEYSTORE_PASSWORD='your-keystore-password'
-export ANDROID_KEY_ALIAS='feishin-remote'
-export ANDROID_KEY_PASSWORD='your-key-password'
-
-flutter build apk \
-  --release \
-  --obfuscate \
-  --split-debug-info=build/symbols/local
-
-unset ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD
-```
-
-A release build intentionally fails when any signing variable is absent rather than producing a debug-signed release.
+The output is in `dist/release`. The build is obfuscated and checked for its signature, application ID, and notification icon. A plain `flutter build apk --release` intentionally fails when any signing variable is absent rather than producing a debug-signed release.
 
 ## Project layout
 
@@ -173,4 +165,8 @@ lib/remote_app.dart           Material navigation, connection setup, and Now Pla
 lib/remote_browser.dart       Catalogs, queue, and playback actions
 assets/logo.svg               Editable logo source
 assets/logo.png               In-app and README logo
+project.json                  App name, description, application ID, site URLs
+tool/                         Verification, release, media, and site scripts
+website/                      Product site
+CHANGELOG.md                  Release notes
 ```
