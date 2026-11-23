@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
-        android:label="Feishin Remote"
+        android:label="${appDisplayName}"
         android:name="${applicationName}"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

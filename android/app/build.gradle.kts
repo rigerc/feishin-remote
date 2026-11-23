@@ -1,8 +1,12 @@
+import groovy.json.JsonSlurper
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val projectConfig = JsonSlurper().parse(rootProject.file("../project.json")) as Map<*, *>
 
 val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
 val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
@@ -47,10 +51,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.feishin.feishin_remote"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // Set in project.json; changing it breaks upgrades for installed copies.
+        applicationId = projectConfig["applicationId"] as String
+        manifestPlaceholders["appDisplayName"] = projectConfig["name"] as String
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
