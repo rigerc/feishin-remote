@@ -1,12 +1,30 @@
 ---
-import Site from "../layouts/Site.astro";
+import LandingLayout from '@/layouts/LandingLayout.astro';
+import { project } from '@/config/project.config';
+import { withBase } from '@/lib/base';
+import '@/styles/project.css';
 ---
-<Site title="Privacy">
-  <article class="document">
-    <h1>Privacy</h1>
-    <p>Feishin Remote connects only to the Feishin server address you enter. It has no accounts, analytics, advertising or tracking, and it sends nothing to the developer or any third party.</p>
-    <p>The app stores saved server addresses, usernames and theme choices in its private app storage. Passwords are stored separately using Android Keystore encryption. Deleting a saved server removes its password, and uninstalling the app removes everything it stored.</p>
-    <p>Feishin serves Remote over plain HTTP by default. Credentials and playback data sent that way can be seen by other devices on an untrusted network, so use a trusted network or an HTTPS/WSS connection you control.</p>
-    <p>This site provides screenshots and a video of the app. Its hosting provider may collect information needed to serve the site.</p>
-  </article>
-</Site>
+
+<LandingLayout title="Privacy" description={`How ${project.name} handles your data.`}>
+  <main id="main-content" class="project-site doc-page">
+    <div class="project-shell">
+      <article>
+        <div class="section-kicker">PRIVACY POLICY</div>
+        <h1>Privacy</h1>
+        <p>{project.name} connects only to the Feishin server address you enter. It has no accounts, analytics, advertising or tracking, and it sends nothing to the developer or any third party.</p>
+
+        <h2>What the app stores</h2>
+        <p>The app stores saved server addresses, usernames and theme choices in its private app storage. Passwords are stored separately using Android Keystore encryption. Deleting a saved server removes its password, and uninstalling the app removes everything it stored. Android cloud backup is turned off for the app.</p>
+
+        <h2>Network connections</h2>
+        <p>Feishin serves Remote over plain HTTP by default. Credentials and playback data sent that way can be seen by other devices on an untrusted network, so use a trusted network or an HTTPS/WSS connection you control. See <a href={withBase('/docs/security/')}>Security</a> for details.</p>
+
+        <h2>This website</h2>
+        <p>This site shows screenshots and a video of the app. It sets no cookies and uses no analytics. Its hosting provider may collect information needed to serve the site, such as IP addresses in server logs.</p>
+
+        <h2>Contact</h2>
+        <p>Questions about privacy can be raised as an issue in the <a href={project.repository}>source repository</a>.</p>
+      </article>
+    </div>
+  </main>
+</LandingLayout>

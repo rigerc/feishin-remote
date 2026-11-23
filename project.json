@@ -1,7 +1,5 @@
 {
   "name": "Feishin Remote",
   "description": "Android remote control for a running Feishin music player.",
-  "applicationId": "com.feishin.feishin_remote",
-  "siteUrl": "",
-  "downloadUrl": ""
+  "applicationId": "com.feishin.feishin_remote"
 }

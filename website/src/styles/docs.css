@@ -1,0 +1,12 @@
+/* Starlight theme: the app's amber accent on its charcoal background. */
+:root {
+  --sl-color-accent-low: #3a2c0f;
+  --sl-color-accent: #c48f22;
+  --sl-color-accent-high: #f5d58f;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #f8e6bd;
+  --sl-color-accent: #95680f;
+  --sl-color-accent-high: #4a3306;
+}

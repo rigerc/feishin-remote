@@ -3,9 +3,9 @@ name: Website and media
 on:
   push:
     branches: ['**']
-    paths: ['website/**', 'lib/**', 'tool/**', 'project.json', 'pubspec.*', '.fvmrc', '.github/workflows/website.yml']
+    paths: ['website/**', 'lib/**', 'assets/**', 'tool/**', 'pubspec.*', '.fvmrc', '.github/workflows/website.yml']
   pull_request:
-    paths: ['website/**', 'lib/**', 'tool/**', 'project.json', 'pubspec.*', '.fvmrc', '.github/workflows/website.yml']
+    paths: ['website/**', 'lib/**', 'assets/**', 'tool/**', 'pubspec.*', '.fvmrc', '.github/workflows/website.yml']
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
@@ -26,22 +26,48 @@ jobs:
           channel: stable
           flutter-version-file: .fvmrc
           cache: true
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: website/package.json
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: website/.nvmrc
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+      # Outputs the Pages origin and, for a project site, its sub-path
+      # (`/feishin-remote`). The path is empty on a custom domain.
       - name: Get Pages URL
         if: vars.PAGES_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
         id: pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: flutter pub get --enforce-lockfile
-      - run: tool/media.sh
-      - run: tool/site.sh
+      - name: Capture app screenshots and video
+        run: tool/media.sh
+      - name: Check and build the site
+        run: tool/site.sh
         env:
-          PUBLIC_REPOSITORY: ${{ github.repository }}
-          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL || steps.pages.outputs.base_url }}
+          DEPLOY_TARGET: static
+          SITE_URL: ${{ steps.pages.outputs.origin }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+      - name: Capture website screenshots and walkthrough
+        working-directory: website
+        env:
+          # The preview server reads the base path from the config, like the build.
+          DEPLOY_TARGET: static
+          SITE_URL: ${{ steps.pages.outputs.origin }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:4321${{ steps.pages.outputs.base_path }}
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec astro preview --background --host 127.0.0.1 --port 4321
+          trap 'pnpm exec astro preview stop' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS "$PLAYWRIGHT_BASE_URL/docs/" -o /dev/null; then break; fi
+            if [[ $attempt == 40 ]]; then pnpm exec astro preview logs; exit 1; fi
+            sleep 1
+          done
+          pnpm media:all
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: website-preview
@@ -52,6 +78,12 @@ jobs:
         with:
           name: app-media
           path: build/media/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: site-media
+          path: website/media-output/
           if-no-files-found: error
           retention-days: 14
       - if: vars.PAGES_ENABLED == 'true' && github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch

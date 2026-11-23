@@ -45,16 +45,13 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Local signing and generated website assets
+# Local signing and release output (website/ has its own .gitignore)
 *.jks
 *.keystore
 .env
 .env.*
+!website/.env.example
 /dist/
-/website/node_modules/
-/website/.astro/
-/website/dist/
-/website/public/media/
 /android/.kotlin/
 
 # Widget Preview related

@@ -1,0 +1,17 @@
+---
+import LandingLayout from '@/layouts/LandingLayout.astro';
+import { withBase } from '@/lib/base';
+import '@/styles/project.css';
+---
+
+<LandingLayout title="Page not found" description="This page could not be found.">
+  <main id="main-content" class="project-site doc-page">
+    <div class="project-shell">
+      <article>
+        <div class="section-kicker">404 / NOT FOUND</div>
+        <h1>Nothing here.</h1>
+        <p>Try the <a href={withBase('/')}>homepage</a> or the <a href={withBase('/docs/')}>documentation</a>.</p>
+      </article>
+    </div>
+  </main>
+</LandingLayout>
