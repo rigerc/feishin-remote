@@ -1,0 +1,53 @@
+---
+import project from "../../../project.json";
+const { title = project.name, description = project.description } = Astro.props;
+const path = (segment = "") => `${import.meta.env.BASE_URL.replace(/\/$/, "")}/${segment}`;
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site) : undefined;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    {canonical && <link rel="canonical" href={canonical.href} />}
+  </head>
+  <body>
+    <header class="wrap">
+      <a class="brand" href={path()}>{project.name}</a>
+      <nav aria-label="Main"><a href={path("support/")}>Support</a></nav>
+    </header>
+    <main class="wrap"><slot /></main>
+    <footer class="wrap"><a href={path("privacy/")}>Privacy</a></footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    color-scheme: dark;
+    font-family: system-ui, sans-serif;
+    color: #f1e8d8;
+    background: #15171a;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .wrap { width: min(100% - 2.5rem, 68rem); margin-inline: auto; }
+
+  header, footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 4.75rem;
+    gap: 1rem;
+  }
+
+  header { border-bottom: 1px solid #34383f; }
+  footer { border-top: 1px solid #34383f; }
+  main { margin-block: clamp(2rem, 6vw, 5rem); }
+  a { color: inherit; text-underline-offset: 0.25em; }
+  .brand { font-weight: 750; text-decoration: none; }
+  .document { max-width: 42rem; line-height: 1.65; }
+  :focus-visible { outline: 2px solid #e9b44c; outline-offset: 5px; }
+</style>
